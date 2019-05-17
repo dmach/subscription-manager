@@ -32,7 +32,7 @@ plugin_type = (TYPE_CORE,)
 log = logging.getLogger('rhsm-app.' + __name__)
 
 
-def posttrans_hook(conduit):
+def postverifytrans_hook(conduit):
     """
     Update product ID certificates.
     """
@@ -103,13 +103,24 @@ class YumProductManager(ProductManager):
 
         active = set([])
 
-        # If a package is in a enabled and 'protected' repo
+        installed_packages = self.base.rpmdb.returnPackages()
+        for pkg in installed_packages:
+            try:
+                # pkg.repoid contains only "installed" string not valid origin
+                # of repository
+                repo = pkg.yumdb_info.from_repo
+            except AttributeError:
+                # When package is installed from local RPM and not from repository
+                # then yumdb_info doesn't have from_source attribute in some case
+                log.debug('Unable to get repo for package: %s' % pkg.name)
+            else:
+                active.add(repo)
 
         # This searches all the package sacks in this yum instances
         # package sack, aka all the enabled repos
-        packages = self.base.pkgSack.returnPackages()
+        available_packages = self.base.pkgSack.returnPackages()
 
-        for p in packages:
+        for p in available_packages:
             repo = p.repoid
             # if a pkg is in multiple repo's, this will consider
             # all the repo's with the pkg "active".
